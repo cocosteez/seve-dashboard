@@ -1,48 +1,22 @@
-import { Inter } from "next/font/google";
-
-const inter = Inter({ subsets: ["latin"] });
-
 export const metadata = { title: "SÈVE Endurance — Sales Dashboard" };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={inter.className}>
-      <body style={{ margin: 0, background: "#0E0E0E" }}>
-        <header
-          style={{
-            background:
-              "linear-gradient(135deg, #0F1112 0%, #1E3B2F 28%, #2D5C88 60%, #D9D6CB 100%)",
-            height: 180,
-            padding: "28px 18px 0 18px",
-          }}
-        >
-          <div
-            style={{
-              maxWidth: 1200,
-              margin: "0 auto",
-              display: "flex",
-              alignItems: "baseline",
-              justifyContent: "space-between",
-            }}
-          >
-            <div
-              style={{
-                color: "white",
-                fontWeight: 900,
-                fontStyle: "italic",
-                letterSpacing: 1,
-                fontSize: 38,
-              }}
-            >
-              SÈVE
-            </div>
-            <div style={{ color: "rgba(255,255,255,.85)", paddingRight: 6 }}>
-              {new Date().toLocaleDateString()}
-            </div>
-          </div>
-        </header>
-
-        <main style={{ marginTop: -70 }}>{children}</main>
+    <html lang="en">
+      <body
+        style={{
+          margin: 0,
+          minHeight: "100vh",
+          // Full-page gradient background (subtle SÈVE vibe)
+          background:
+            "linear-gradient(180deg, #1f3d34 0%, #17323c 40%, #0f1418 100%)",
+          // Smooth font rendering
+          WebkitFontSmoothing: "antialiased",
+          MozOsxFontSmoothing: "grayscale",
+          color: "#0F1112",
+        }}
+      >
+        {children}
       </body>
     </html>
   );
