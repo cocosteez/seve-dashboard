@@ -1,4 +1,4 @@
-"use client";
+a"use client";
 
 import { useEffect, useMemo, useState, useCallback } from "react";
 import {
@@ -50,18 +50,14 @@ const defaults: Inputs = {
   callsPerDay: 90,
 };
 
-/** Consistent CA$ currency with no cents */
 function money(n: number) {
-  // force CA$ prefix and no decimals
   const parts = Math.round(n).toLocaleString("en-CA");
   return `CA$${parts}`;
 }
-
 function pct(n: number) {
   return (n * 100).toFixed(0) + "%";
 }
 
-/** Stable numeric input: lets users type freely, commits on blur/enter */
 function NumericInput({
   value,
   onCommit,
@@ -105,16 +101,6 @@ function NumericInput({
   );
 }
 
-/** Small caption under KPI numbers */
-function KpiCaption() {
-  return (
-    <div style={{ marginTop: 6, fontSize: 11, color: brand.slate }}>
-      Calculated from fixed assumptions below
-    </div>
-  );
-}
-
-/** Custom legend renderer (keeps TS happy by using a function) */
 function CustomLegend(props: any) {
   const payload = props?.payload ?? [];
   return (
@@ -169,11 +155,7 @@ export default function Page() {
       cum += revenuePerMonth;
       const goalCum = monthlyGoal * (i + 1);
       const label = new Date(2000, i, 1).toLocaleString(undefined, { month: "short" });
-      return {
-        name: label,
-        cumulative: Math.round(cum),
-        goal: Math.round(goalCum),
-      };
+      return { name: label, cumulative: Math.round(cum), goal: Math.round(goalCum) };
     });
 
     const maxY = Math.max(...data.map((r) => Math.max(r.cumulative, r.goal)), 1);
@@ -181,7 +163,6 @@ export default function Page() {
       maxY >= 1_000_000
         ? (v: number) => "CA$" + (v / 1_000_000).toFixed(1) + "M"
         : (v: number) => "CA$" + Math.round(v / 1000) + "K";
-
     const yDomain = [0, Math.ceil(maxY * 1.08)];
 
     return {
@@ -230,19 +211,27 @@ export default function Page() {
     </div>
   );
 
-  // shared style values
-  const kpiMinHeight = 142; // equal height for all KPI cards
-  const headerGap = 14;
-  const inputsRowGap = 12; // increased breathing room
+  // unified layout constants
+  const OUTER_MAX = 1220;               // page width
+  const OUTER_PAD = 24;                 // left/right padding
+  const TOP_SPACER = 48;                // space from top edge
+  const GRID_GAP = 16;                  // consistent gap between cards
+  const KPI_MIN_H = 140;
 
   return (
-    <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 18px 28px" }}>
-      {/* Top: Inputs + KPIs (equal heights & rhythm) */}
+    <div
+      style={{
+        maxWidth: OUTER_MAX,
+        margin: "0 auto",
+        padding: `${TOP_SPACER}px ${OUTER_PAD}px 40px`,
+      }}
+    >
+      {/* Row 1: Inputs + KPIs (consistent heights & spacing) */}
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "1.6fr 1fr 1fr 1fr",
-          gap: headerGap,
+          gridTemplateColumns: "1.55fr 1fr 1fr 1fr",
+          gap: GRID_GAP,
           alignItems: "stretch",
         }}
       >
@@ -251,7 +240,7 @@ export default function Page() {
             style={{
               display: "grid",
               gridTemplateColumns: "1fr 1fr",
-              gap: inputsRowGap,
+              gap: 12,
             }}
           >
             <label>
@@ -306,35 +295,41 @@ export default function Page() {
           </div>
         </Card>
 
-        <Card title="Meetings / Day" minHeight={kpiMinHeight}>
+        <Card title="Meetings / Day" minHeight={KPI_MIN_H}>
           <div style={{ fontSize: 32, fontWeight: 900, lineHeight: 1 }}>
             {d.meetingsPerDay.toFixed(1)}
           </div>
-          <KpiCaption />
+          <div style={{ marginTop: 6, fontSize: 11, color: brand.slate }}>
+            Calculated from fixed assumptions below
+          </div>
         </Card>
 
-        <Card title="Orders / Week" minHeight={kpiMinHeight}>
+        <Card title="Orders / Week" minHeight={KPI_MIN_H}>
           <div style={{ fontSize: 32, fontWeight: 900, lineHeight: 1 }}>
             {Math.round(d.ordersPerWeek).toLocaleString()}
           </div>
-          <KpiCaption />
+          <div style={{ marginTop: 6, fontSize: 11, color: brand.slate }}>
+            Calculated from fixed assumptions below
+          </div>
         </Card>
 
-        <Card title="Revenue / Week" minHeight={kpiMinHeight}>
+        <Card title="Revenue / Week" minHeight={KPI_MIN_H}>
           <div style={{ fontSize: 32, fontWeight: 900, lineHeight: 1 }}>
             {money(d.revenuePerWeek)}
           </div>
-          <KpiCaption />
+          <div style={{ marginTop: 6, fontSize: 11, color: brand.slate }}>
+            Calculated from fixed assumptions below
+          </div>
         </Card>
       </div>
 
-      {/* Second row */}
+      {/* Row 2 */}
       <div
         style={{
           display: "grid",
           gridTemplateColumns: "1.3fr 1fr 1fr",
-          gap: headerGap,
-          marginTop: headerGap,
+          gap: GRID_GAP,
+          marginTop: GRID_GAP,
         }}
       >
         <Card title="Assumptions (Fixed)">
@@ -349,13 +344,7 @@ export default function Page() {
 
         <Card title="Monthly Pace">
           <Stat k="Revenue / Month" v={money(d.revenuePerMonth)} />
-          <div
-            style={{
-              height: 1,
-              background: "rgba(0,0,0,0.12)",
-              margin: "8px 0 10px",
-            }}
-          />
+          <div style={{ height: 1, background: "rgba(0,0,0,0.12)", margin: "8px 0 10px" }} />
           <Stat k="Cumulative (3 mo)" v={money(d.data[2]?.cumulative || 0)} />
           <div style={{ marginTop: 4, fontSize: 11, color: brand.slate }}>
             Assumes 4.333 weeks / month
@@ -365,29 +354,19 @@ export default function Page() {
         <Card title="Year at Pace">
           <Stat k="Orders (year)" v={Math.round(d.ordersYear).toLocaleString()} />
           <Stat k="Revenue (year)" v={money(d.revenueYear)} />
-          <div
-            style={{
-              height: 1,
-              background: "rgba(0,0,0,0.12)",
-              margin: "8px 0 10px",
-            }}
-          />
+          <div style={{ height: 1, background: "rgba(0,0,0,0.12)", margin: "8px 0 10px" }} />
           <Stat k="% of Year Goal" v={pct(d.revenueYear / inp.salesGoal)} />
         </Card>
       </div>
 
       {/* Chart */}
       <Card title="Cumulative Revenue vs Goal" >
-        <div style={{ height: 360, marginTop: 6 }}>
+        <div style={{ height: 380, marginTop: 6 }}>
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={d.data} margin={{ top: 6, right: 12, left: 0, bottom: 0 }}>
+            <BarChart data={d.data} margin={{ top: 6, right: 12, left: 0, bottom: 4 }}>
               <CartesianGrid strokeDasharray="3 3" stroke={brand.grid} />
               <XAxis dataKey="name" stroke={brand.slate} />
-              <YAxis
-                stroke={brand.slate}
-                tickFormatter={d.yFormat as any}
-                domain={d.yDomain as any}
-              />
+              <YAxis stroke={brand.slate} tickFormatter={d.yFormat as any} domain={d.yDomain as any} />
               <Tooltip
                 formatter={(v: any, n: any) => [
                   money(Number(v)),
@@ -395,12 +374,7 @@ export default function Page() {
                 ]}
               />
               <Legend verticalAlign="top" align="left" content={(p) => <CustomLegend {...p} />} />
-              <Bar
-                dataKey="cumulative"
-                name="Cumulative Revenue"
-                fill={brand.deepBlue}
-                radius={[8, 8, 0, 0]}
-              />
+              <Bar dataKey="cumulative" name="Cumulative Revenue" fill={brand.deepBlue} radius={[8, 8, 0, 0]} />
               <Line
                 type="monotone"
                 dataKey="goal"
