@@ -13,25 +13,26 @@ import {
   Legend,
 } from "recharts";
 
+/* Brand tokens */
 const brand = {
   ink: "#0F1112",
   forest: "#1E3B2F",
-  slate: "#606468",
-  stone: "#E8E5DC",
-  off: "#FAFAF7",
+  slate: "#6F767E",
+  stone: "#E5E3DA",
+  off: "#F8F8F5",
   deepBlue: "#2D5C88",
   gold: "#D4A373",
   card: "#FFFFFF",
-  border: "#E6E6E6",
+  border: "#E8E8E6",
   grid: "#ECECEC",
 };
 
 const LOCK = {
-  closeRate: 0.6,
-  emailToMeeting: 0.1,
-  callToMeeting: 0.2,
-  team: 1,
-  workdays: 6,
+  closeRate: 0.6, // fixed
+  emailToMeeting: 0.1, // fixed
+  callToMeeting: 0.2, // fixed
+  team: 1, // fixed
+  workdays: 6, // fixed
 };
 
 type Inputs = {
@@ -58,6 +59,7 @@ function pct(n: number) {
   return (n * 100).toFixed(0) + "%";
 }
 
+/** Numeric input that won’t reset while typing */
 function NumericInput({
   value,
   onCommit,
@@ -101,6 +103,7 @@ function NumericInput({
   );
 }
 
+/** Custom legend (typed loosely to avoid recharts type friction on Vercel) */
 function CustomLegend(props: any) {
   const payload = props?.payload ?? [];
   return (
@@ -120,6 +123,7 @@ function CustomLegend(props: any) {
 }
 
 export default function Page() {
+  /* Inputs */
   const [inp, setInp] = useState<Inputs>(() => {
     if (typeof window === "undefined") return defaults;
     try {
@@ -129,13 +133,25 @@ export default function Page() {
       return defaults;
     }
   });
-
   useEffect(() => {
     try {
       localStorage.setItem("seve.inputs", JSON.stringify(inp));
     } catch {}
   }, [inp]);
 
+  /* Sales closed (for progress bar) */
+  const [closed, setClosed] = useState<number>(() => {
+    if (typeof window === "undefined") return 0;
+    const v = localStorage.getItem("seve.closed");
+    return v ? Number(v) || 0 : 0;
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem("seve.closed", String(closed));
+    } catch {}
+  }, [closed]);
+
+  /* Calculations */
   const d = useMemo(() => {
     const weeks = Math.round(inp.months * 4.333);
     const meetingsPerDay =
@@ -178,6 +194,7 @@ export default function Page() {
     };
   }, [inp]);
 
+  /* Card + stat helpers */
   const Card = ({
     title,
     children,
@@ -192,7 +209,7 @@ export default function Page() {
         background: brand.card,
         borderRadius: 14,
         border: `1px solid ${brand.border}`,
-        boxShadow: "0 10px 28px rgba(0,0,0,0.08)",
+        boxShadow: "0 10px 24px rgba(0,0,0,0.12)",
         padding: 16,
         minHeight,
       }}
@@ -211,20 +228,25 @@ export default function Page() {
     </div>
   );
 
+  /* Layout constants */
   const OUTER_MAX = 1220;
   const OUTER_PAD = 24;
-  const TOP_SPACER = 48;
+  const TOP_SPACER = 8; // header already has padding
   const GRID_GAP = 16;
   const KPI_MIN_H = 140;
+
+  /* Progress bar values */
+  const progress = Math.max(0, Math.min(1, closed / Math.max(1, inp.salesGoal)));
 
   return (
     <div
       style={{
         maxWidth: OUTER_MAX,
         margin: "0 auto",
-        padding: `${TOP_SPACER}px ${OUTER_PAD}px 40px`,
+        padding: `${TOP_SPACER}px ${OUTER_PAD}px 48px`,
       }}
     >
+      {/* Row: Inputs + KPIs */}
       <div
         style={{
           display: "grid",
@@ -292,7 +314,7 @@ export default function Page() {
             {d.meetingsPerDay.toFixed(1)}
           </div>
           <div style={{ marginTop: 6, fontSize: 11, color: brand.slate }}>
-            Calculated from fixed assumptions below
+            Calculated from fixed assumptions
           </div>
         </Card>
 
@@ -301,7 +323,7 @@ export default function Page() {
             {Math.round(d.ordersPerWeek).toLocaleString()}
           </div>
           <div style={{ marginTop: 6, fontSize: 11, color: brand.slate }}>
-            Calculated from fixed assumptions below
+            Calculated from fixed assumptions
           </div>
         </Card>
 
@@ -310,29 +332,20 @@ export default function Page() {
             {money(d.revenuePerWeek)}
           </div>
           <div style={{ marginTop: 6, fontSize: 11, color: brand.slate }}>
-            Calculated from fixed assumptions below
+            Calculated from fixed assumptions
           </div>
         </Card>
       </div>
 
+      {/* Row: Monthly pace + Year pace + Closing sales */}
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "1.3fr 1fr 1fr",
+          gridTemplateColumns: "1.1fr 1fr 1.1fr",
           gap: GRID_GAP,
           marginTop: GRID_GAP,
         }}
       >
-        <Card title="Assumptions (Fixed)">
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10 }}>
-            <Stat k="Close Rate" v="60%" />
-            <Stat k="Email→Meeting" v="10%" />
-            <Stat k="Call→Meeting" v="20%" />
-            <Stat k="Team Size" v="1" />
-            <Stat k="Workdays / Week" v="6" />
-          </div>
-        </Card>
-
         <Card title="Monthly Pace">
           <Stat k="Revenue / Month" v={money(d.revenuePerMonth)} />
           <div style={{ height: 1, background: "rgba(0,0,0,0.12)", margin: "8px 0 10px" }} />
@@ -348,9 +361,84 @@ export default function Page() {
           <div style={{ height: 1, background: "rgba(0,0,0,0.12)", margin: "8px 0 10px" }} />
           <Stat k="% of Year Goal" v={pct(d.revenueYear / inp.salesGoal)} />
         </Card>
+
+        {/* Closing Sales (with progress) */}
+        <Card title="Closing Sales">
+          <div style={{ display: "grid", gridTemplateColumns: "1fr auto auto", gap: 10 }}>
+            <NumericInput
+              value={0}
+              onCommit={(val) => {
+                if (val > 0) setClosed((c) => c + val);
+              }}
+              min={0}
+              max={1_000_000}
+            />
+            <button
+              onClick={() => setClosed(0)}
+              style={{
+                borderRadius: 10,
+                border: `1px solid ${brand.border}`,
+                background: brand.off,
+                padding: "10px 14px",
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+              title="Reset closed sales"
+            >
+              Reset
+            </button>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                paddingLeft: 6,
+                fontWeight: 800,
+                color: brand.forest,
+              }}
+              title="Closed to date"
+            >
+              {money(closed)}
+            </div>
+          </div>
+
+          {/* Progress Bar */}
+          <div style={{ marginTop: 12 }}>
+            <div
+              style={{
+                height: 12,
+                background: "#EDEDEB",
+                borderRadius: 999,
+                overflow: "hidden",
+                border: `1px solid ${brand.border}`,
+              }}
+            >
+              <div
+                style={{
+                  width: `${progress * 100}%`,
+                  height: "100%",
+                  background: brand.forest,
+                  transition: "width .25s ease",
+                }}
+              />
+            </div>
+            <div
+              style={{
+                fontSize: 12,
+                color: brand.slate,
+                marginTop: 6,
+                display: "flex",
+                justifyContent: "space-between",
+              }}
+            >
+              <span>Progress toward Sales Goal</span>
+              <span>{pct(progress)}</span>
+            </div>
+          </div>
+        </Card>
       </div>
 
-      <Card title="Cumulative Revenue vs Goal">
+      {/* Chart */}
+      <Card title="Cumulative Revenue vs Goal" >
         <div style={{ height: 380, marginTop: 6 }}>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={d.data} margin={{ top: 6, right: 12, left: 0, bottom: 4 }}>
@@ -383,6 +471,65 @@ export default function Page() {
           </ResponsiveContainer>
         </div>
       </Card>
+
+      {/* Bottom: Assumptions (smaller) */}
+      <div
+        style={{
+          marginTop: 16,
+          display: "grid",
+          gridTemplateColumns: "repeat(5, 1fr)",
+          gap: 12,
+        }}
+      >
+        <div style={miniBox()}>
+          <div style={miniK()}>Close Rate</div>
+          <div style={miniV()}>60%</div>
+        </div>
+        <div style={miniBox()}>
+          <div style={miniK()}>Email → Meeting</div>
+          <div style={miniV()}>10%</div>
+        </div>
+        <div style={miniBox()}>
+          <div style={miniK()}>Call → Meeting</div>
+          <div style={miniV()}>20%</div>
+        </div>
+        <div style={miniBox()}>
+          <div style={miniK()}>Team Size</div>
+          <div style={miniV()}>1</div>
+        </div>
+        <div style={miniBox()}>
+          <div style={miniK()}>Workdays / Week</div>
+          <div style={miniV()}>6</div>
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div
+        style={{
+          marginTop: 18,
+          color: "rgba(255,255,255,0.88)",
+          fontSize: 12,
+          textAlign: "center",
+        }}
+      >
+        All rights reserved — <strong>SÈVE Exclusive</strong>
+      </div>
     </div>
   );
+}
+
+/* Small helper styles for assumptions band */
+function miniBox(): React.CSSProperties {
+  return {
+    background: "rgba(255,255,255,0.92)",
+    borderRadius: 10,
+    border: `1px solid ${brand.border}`,
+    padding: "10px 12px",
+  };
+}
+function miniK(): React.CSSProperties {
+  return { color: brand.slate, fontSize: 11, marginBottom: 2 };
+}
+function miniV(): React.CSSProperties {
+  return { color: brand.forest, fontWeight: 800, fontSize: 14 };
 }
