@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ResponsiveContainer,
   BarChart,
@@ -10,10 +10,8 @@ import {
   Tooltip,
   CartesianGrid,
   Line,
-  Legend,
 } from "recharts";
 
-// --- brand palette ---
 const brand = {
   ink: "#0F1112",
   forest: "#1E3B2F",
@@ -27,13 +25,13 @@ const brand = {
   grid: "#ECECEC",
 };
 
-// --- fixed assumptions (locked) ---
+// ── fixed assumptions (locked) ────────────────────────────────────────────────
 const LOCK = {
-  closeRate: 0.6,         // 60%
-  emailToMeeting: 0.10,   // 10%
-  callToMeeting: 0.20,    // 20%
+  closeRate: 0.6, // 60%
+  emailToMeeting: 0.10, // 10%
+  callToMeeting: 0.20, // 20%
   team: 1,
-  workdays: 6,            // fixed at 6 per your spec
+  workdays: 6,
 };
 
 type Inputs = {
@@ -63,89 +61,11 @@ function pct(n: number) {
   return (n * 100).toFixed(0) + "%";
 }
 
-/** Numeric input that won't reset while typing */
-function NumericInput({
-  value,
-  onCommit,
-  placeholder,
-}: {
-  value: number;
-  onCommit: (n: number) => void;
-  placeholder?: string;
-}) {
-  const [raw, setRaw] = useState<string>(() => String(value));
-  useEffect(() => { setRaw(String(value)); }, [value]);
-
-  const commit = useCallback(() => {
-    const cleaned = raw.replace(/,/g, "").trim();
-    const n = cleaned === "" ? 0 : Number(cleaned);
-    const safe = Number.isFinite(n) ? n : 0;
-    onCommit(safe);
-    setRaw(
-      safe.toLocaleString(undefined, { maximumFractionDigits: 0 })
-    );
-  }, [raw, onCommit]);
-
-  return (
-    <input
-      value={raw}
-      onChange={(e) => setRaw(e.target.value)}
-      onBlur={commit}
-      onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
-      inputMode="decimal"
-      placeholder={placeholder}
-      style={{
-        border: `1px solid ${brand.stone}`,
-        borderRadius: 10,
-        padding: "10px 12px",
-        background: brand.off,
-        fontWeight: 600,
-      }}
-    />
-  );
-}
-
-// --- custom legend content (types kept lenient for recharts payload) ---
-function LegendContent({ payload }: any) {
-  return (
-    <div style={{ display: "flex", gap: 16, paddingBottom: 6 }}>
-      {payload?.map((entry: any) => {
-        const isLine = entry.type === "line";
-        return (
-          <div key={entry.value} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            {isLine ? (
-              <span
-                style={{
-                  width: 16,
-                  height: 0,
-                  borderTop: `3px dashed ${entry.color}`,
-                  display: "inline-block",
-                }}
-              />
-            ) : (
-              <span
-                style={{
-                  width: 12,
-                  height: 12,
-                  borderRadius: 3,
-                  background: entry.color,
-                  display: "inline-block",
-                }}
-              />
-            )}
-            <span style={{ color: brand.slate, fontSize: 12 }}>{entry.value}</span>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 export default function Page() {
   const [inp, setInp] = useState<Inputs>(() => {
     if (typeof window === "undefined") return defaults;
     try {
-      const saved = localStorage.getItem("seve.fixed.inputs.v3");
+      const saved = localStorage.getItem("seve.fixed.inputs");
       return saved ? JSON.parse(saved) : defaults;
     } catch {
       return defaults;
@@ -153,7 +73,9 @@ export default function Page() {
   });
 
   useEffect(() => {
-    try { localStorage.setItem("seve.fixed.inputs.v3", JSON.stringify(inp)); } catch {}
+    try {
+      localStorage.setItem("seve.fixed.inputs", JSON.stringify(inp));
+    } catch {}
   }, [inp]);
 
   const d = useMemo(() => {
@@ -171,39 +93,41 @@ export default function Page() {
     const revenueYear = revenuePerMonth * inp.months;
     const ordersYear = ordersPerWeek * weeks;
 
-    const monthsArr = Array.from({ length: inp.months }, (_, i) => i);
+    const months = Array.from({ length: inp.months }, (_, i) => i);
     const monthlyGoal = inp.salesGoal / inp.months;
 
     let cum = 0;
-    const data = monthsArr.map((i) => {
+    const data = months.map((i) => {
       cum += revenuePerMonth;
       const goalCum = monthlyGoal * (i + 1);
-      const label = new Date(2000, i, 1).toLocaleString(undefined, { month: "short" });
+      const label = new Date(2000, i, 1).toLocaleString(undefined, {
+        month: "short",
+      });
       return { name: label, cumulative: Math.round(cum), goal: Math.round(goalCum) };
     });
 
-    const maxY = Math.max(...data.map((r) => Math.max(r.cumulative, r.goal)));
-    const yFormat =
-      maxY >= 1_000_000
-        ? (v: number) => "$" + (v / 1_000_000).toFixed(1) + "M"
-        : (v: number) => "$" + (v / 1000).toFixed(0) + "k";
-
     return {
       meetingsPerDay,
+      meetingsPerWeekTeam,
       ordersPerWeek,
+      ordersYear,
       revenuePerWeek,
       revenuePerMonth,
       revenueYear,
-      ordersYear,
       data,
-      yFormat,
     };
   }, [inp]);
 
-  // small UI helpers
+  // UI helpers
   const Card = ({
-    title, children, style,
-  }: { title: string; children: any; style?: React.CSSProperties }) => (
+    title,
+    children,
+    style,
+  }: {
+    title: string;
+    children: any;
+    style?: React.CSSProperties;
+  }) => (
     <div
       style={{
         background: brand.card,
@@ -214,95 +138,145 @@ export default function Page() {
         ...style,
       }}
     >
-      <div style={{ fontWeight: 800, color: brand.forest, marginBottom: 10 }}>{title}</div>
+      <div style={{ fontWeight: 800, color: brand.forest, marginBottom: 10 }}>
+        {title}
+      </div>
       {children}
     </div>
   );
 
   const InputField = ({
-    label, value, onCommit,
-  }: { label: string; value: number; onCommit: (n: number) => void }) => (
-    <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", alignItems: "center", gap: 8 }}>
+    label,
+    value,
+    onChange,
+  }: {
+    label: string;
+    value: number;
+    onChange: (n: number) => void;
+  }) => (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "1.2fr 1fr",
+        alignItems: "center",
+        gap: 8,
+      }}
+    >
       <div style={{ color: brand.slate, fontSize: 12 }}>{label}</div>
-      <NumericInput value={value} onCommit={onCommit} />
+      <input
+        value={String(value)}
+        onChange={(e) => onChange(Number(e.target.value || 0))}
+        inputMode="decimal"
+        style={{
+          border: `1px solid ${brand.stone}`,
+          borderRadius: 10,
+          padding: "10px 12px",
+          background: brand.off,
+          fontWeight: 600,
+        }}
+      />
     </div>
   );
 
   const Stat = ({ k, v }: { k: string; v: string }) => (
-    <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", alignItems: "center", marginBottom: 8 }}>
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "1.2fr 1fr",
+        alignItems: "center",
+        marginBottom: 8,
+      }}
+    >
       <div style={{ color: brand.slate, fontSize: 12 }}>{k}</div>
-      <div style={{ textAlign: "right", fontWeight: 800, color: brand.forest }}>{v}</div>
+      <div style={{ textAlign: "right", fontWeight: 800, color: brand.forest }}>
+        {v}
+      </div>
     </div>
   );
 
   return (
     <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 18px 28px" }}>
-      {/* Top row: Inputs (wide) → KPI1 → KPI2 → KPI3 */}
+      {/* row: inputs + KPIs */}
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "1.6fr 1fr 1fr 1fr",
+          gridTemplateColumns: "1.4fr 1fr 1fr 1fr",
           gap: 14,
-          marginTop: -44,
+          marginTop: -40,
         }}
       >
         <Card title="Inputs">
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: 12,
+            }}
+          >
             <InputField
               label="Sales Goal"
               value={inp.salesGoal}
-              onCommit={(v) => setInp((s) => ({ ...s, salesGoal: v }))}
+              onChange={(v) => setInp((s) => ({ ...s, salesGoal: v }))}
             />
             <InputField
               label="Average Order Value"
               value={inp.aov}
-              onCommit={(v) => setInp((s) => ({ ...s, aov: v }))}
+              onChange={(v) => setInp((s) => ({ ...s, aov: v }))}
             />
             <InputField
               label="Timeline (months)"
               value={inp.months}
-              onCommit={(v) => setInp((s) => ({ ...s, months: v }))}
+              onChange={(v) => setInp((s) => ({ ...s, months: v }))}
             />
             <div />
             <InputField
               label="Emails / Day"
               value={inp.emailsPerDay}
-              onCommit={(v) => setInp((s) => ({ ...s, emailsPerDay: v }))}
+              onChange={(v) => setInp((s) => ({ ...s, emailsPerDay: v }))}
             />
             <InputField
               label="Calls / Day"
               value={inp.callsPerDay}
-              onCommit={(v) => setInp((s) => ({ ...s, callsPerDay: v }))}
+              onChange={(v) => setInp((s) => ({ ...s, callsPerDay: v }))}
             />
           </div>
         </Card>
 
         <Card title="Meetings / Day">
-          <div style={{ fontSize: 28, fontWeight: 900 }}>
-            {Number(d.meetingsPerDay.toFixed(2)).toLocaleString()}
-          </div>
+          <div style={{ fontSize: 30, fontWeight: 900 }}>{Number(d.meetingsPerDay.toFixed(2)).toLocaleString()}</div>
         </Card>
         <Card title="Orders / Week">
-          <div style={{ fontSize: 28, fontWeight: 900 }}>
-            {Math.round(d.ordersPerWeek).toLocaleString()}
-          </div>
+          <div style={{ fontSize: 30, fontWeight: 900 }}>{Math.round(d.ordersPerWeek).toLocaleString()}</div>
         </Card>
         <Card title="Revenue / Week">
-          <div style={{ fontSize: 28, fontWeight: 900 }}>{money(d.revenuePerWeek)}</div>
+          <div style={{ fontSize: 30, fontWeight: 900 }}>{money(d.revenuePerWeek)}</div>
         </Card>
       </div>
 
-      {/* Second row: Assumptions → Monthly → Year */}
+      {/* row: fixed assumptions + monthly + yearly */}
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "1.3fr 1fr 1fr",
+          gridTemplateColumns: "1.2fr 1fr 1fr",
           gap: 14,
           marginTop: 14,
         }}
       >
         <Card title="Assumptions (Fixed)">
-          <Assumptions />
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(6, 1fr)",
+              gap: 10,
+            }}
+          >
+            <MiniBadge label="Close Rate" value={pct(LOCK.closeRate)} />
+            <MiniBadge label="Email→Meeting" value={pct(LOCK.emailToMeeting)} />
+            <MiniBadge label="Call→Meeting" value={pct(LOCK.callToMeeting)} />
+            <MiniBadge label="Team Size" value={String(LOCK.team)} />
+            <MiniBadge label="Workdays / Week" value={String(LOCK.workdays)} />
+            <MiniBadge label="AOV Editable" value="In Inputs" />
+          </div>
         </Card>
 
         <Card title="Monthly Pace">
@@ -328,36 +302,25 @@ export default function Page() {
         </Card>
       </div>
 
-      {/* Chart */}
+      {/* chart */}
       <Card title="Cumulative Revenue vs Goal" style={{ marginTop: 14 }}>
         <div style={{ height: 360 }}>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={d.data} margin={{ top: 10, right: 12, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke={brand.grid} />
               <XAxis dataKey="name" stroke={brand.slate} />
-              <YAxis stroke={brand.slate} tickFormatter={d.yFormat as any} />
-              <Tooltip
-                formatter={(v: any, n: any) =>
-                  [`${money(Number(v))}`, n === "cumulative" ? "Cumulative Revenue" : "Goal"]
-                }
+              <YAxis
+                stroke={brand.slate}
+                tickFormatter={(v) => "$" + (v / 1000).toFixed(0) + "k"}
               />
-              <Legend verticalAlign="top" align="left" content={<LegendContent />} />
-
-              <Bar
-                dataKey="cumulative"
-                name="Cumulative Revenue"
-                fill={brand.deepBlue}
-                radius={[8, 8, 0, 0]}
-              />
+              <Tooltip formatter={(v: any) => money(Number(v))} />
+              <Bar dataKey="cumulative" fill={brand.deepBlue} radius={[8, 8, 0, 0]} />
               <Line
                 type="monotone"
                 dataKey="goal"
-                name="Goal"
                 stroke={brand.gold}
-                strokeDasharray="6 6"
                 strokeWidth={3}
                 dot={false}
-                activeDot={{ r: 4 }}
               />
             </BarChart>
           </ResponsiveContainer>
@@ -367,32 +330,22 @@ export default function Page() {
   );
 }
 
-function Assumptions() {
-  const rowStyle: React.CSSProperties = {
-    background: "#F6F6F4",
-    border: "1px solid #E6E4DE",
-    borderRadius: 12,
-    padding: "10px 12px",
-    display: "flex",
-    flexDirection: "column",
-    gap: 4,
-  };
-  const labelStyle: React.CSSProperties = { color: "#6A6E72", fontSize: 11 };
-
-  const Item = ({ k, v }: { k: string; v: string }) => (
-    <div style={rowStyle}>
-      <div style={labelStyle}>{k}</div>
-      <div style={{ fontWeight: 800 }}>{v}</div>
-    </div>
-  );
-
+// small pill stat used inside Assumptions card
+function MiniBadge({ label, value }: { label: string; value: string }) {
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10 }}>
-      <Item k="Close Rate" v="60%" />
-      <Item k="Email→Meeting" v="10%" />
-      <Item k="Call→Meeting" v="20%" />
-      <Item k="Team Size" v="1" />
-      <Item k="Workdays / Week" v="6" />
+    <div
+      style={{
+        background: "#F6F6F4",
+        border: "1px solid #E6E4DE",
+        borderRadius: 12,
+        padding: "10px 12px",
+        display: "flex",
+        flexDirection: "column",
+        gap: 4,
+      }}
+    >
+      <div style={{ color: "#6A6E72", fontSize: 11 }}>{label}</div>
+      <div style={{ fontWeight: 800 }}>{value}</div>
     </div>
   );
 }
