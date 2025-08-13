@@ -1,4 +1,4 @@
-a"use client";
+"use client";
 
 import { useEffect, useMemo, useState, useCallback } from "react";
 import {
@@ -211,11 +211,10 @@ export default function Page() {
     </div>
   );
 
-  // unified layout constants
-  const OUTER_MAX = 1220;               // page width
-  const OUTER_PAD = 24;                 // left/right padding
-  const TOP_SPACER = 48;                // space from top edge
-  const GRID_GAP = 16;                  // consistent gap between cards
+  const OUTER_MAX = 1220;
+  const OUTER_PAD = 24;
+  const TOP_SPACER = 48;
+  const GRID_GAP = 16;
   const KPI_MIN_H = 140;
 
   return (
@@ -226,7 +225,6 @@ export default function Page() {
         padding: `${TOP_SPACER}px ${OUTER_PAD}px 40px`,
       }}
     >
-      {/* Row 1: Inputs + KPIs (consistent heights & spacing) */}
       <div
         style={{
           display: "grid",
@@ -236,13 +234,7 @@ export default function Page() {
         }}
       >
         <Card title="Inputs">
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: 12,
-            }}
-          >
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <label>
               <div style={{ fontSize: 12, color: brand.slate, marginBottom: 6 }}>Sales Goal</div>
               <NumericInput
@@ -323,7 +315,6 @@ export default function Page() {
         </Card>
       </div>
 
-      {/* Row 2 */}
       <div
         style={{
           display: "grid",
@@ -359,14 +350,17 @@ export default function Page() {
         </Card>
       </div>
 
-      {/* Chart */}
-      <Card title="Cumulative Revenue vs Goal" >
+      <Card title="Cumulative Revenue vs Goal">
         <div style={{ height: 380, marginTop: 6 }}>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={d.data} margin={{ top: 6, right: 12, left: 0, bottom: 4 }}>
               <CartesianGrid strokeDasharray="3 3" stroke={brand.grid} />
               <XAxis dataKey="name" stroke={brand.slate} />
-              <YAxis stroke={brand.slate} tickFormatter={d.yFormat as any} domain={d.yDomain as any} />
+              <YAxis
+                stroke={brand.slate}
+                tickFormatter={d.yFormat as any}
+                domain={d.yDomain as any}
+              />
               <Tooltip
                 formatter={(v: any, n: any) => [
                   money(Number(v)),
