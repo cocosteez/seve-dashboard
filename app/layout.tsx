@@ -18,7 +18,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           MozOsxFontSmoothing: "grayscale",
         }}
       >
-        {/* Top brand bar */}
         <div
           style={{
             width: "100%",
@@ -36,7 +35,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               gap: 18,
             }}
           >
-            {/* Big SÈVE wordmark */}
             <div
               style={{
                 fontWeight: 900,
@@ -48,8 +46,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             >
               SÈVE
             </div>
-
-            {/* Date (top‑right of container) */}
             <div style={{ marginLeft: "auto", color: "rgba(255,255,255,0.85)", fontSize: 13 }}>
               {new Date().toLocaleDateString(undefined, {
                 year: "numeric",
