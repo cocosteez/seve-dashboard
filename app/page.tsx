@@ -13,6 +13,7 @@ import {
   Legend,
 } from "recharts";
 
+// --- brand palette ---
 const brand = {
   ink: "#0F1112",
   forest: "#1E3B2F",
@@ -26,13 +27,13 @@ const brand = {
   grid: "#ECECEC",
 };
 
-// ── fixed assumptions (locked) ────────────────────────────────────────────────
+// --- fixed assumptions (locked) ---
 const LOCK = {
-  closeRate: 0.6, // 60%
-  emailToMeeting: 0.10, // 10%
-  callToMeeting: 0.20, // 20%
+  closeRate: 0.6,         // 60%
+  emailToMeeting: 0.10,   // 10%
+  callToMeeting: 0.20,    // 20%
   team: 1,
-  workdays: 6,
+  workdays: 6,            // fixed at 6 per your spec
 };
 
 type Inputs = {
@@ -73,20 +74,15 @@ function NumericInput({
   placeholder?: string;
 }) {
   const [raw, setRaw] = useState<string>(() => String(value));
-
-  // keep raw in sync if parent changes externally
-  useEffect(() => {
-    setRaw(String(value));
-  }, [value]);
+  useEffect(() => { setRaw(String(value)); }, [value]);
 
   const commit = useCallback(() => {
     const cleaned = raw.replace(/,/g, "").trim();
     const n = cleaned === "" ? 0 : Number(cleaned);
-    onCommit(Number.isFinite(n) ? n : 0);
+    const safe = Number.isFinite(n) ? n : 0;
+    onCommit(safe);
     setRaw(
-      (Number.isFinite(n) ? n : 0).toLocaleString(undefined, {
-        maximumFractionDigits: 0,
-      })
+      safe.toLocaleString(undefined, { maximumFractionDigits: 0 })
     );
   }, [raw, onCommit]);
 
@@ -95,11 +91,7 @@ function NumericInput({
       value={raw}
       onChange={(e) => setRaw(e.target.value)}
       onBlur={commit}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") {
-          (e.target as HTMLInputElement).blur();
-        }
-      }}
+      onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
       inputMode="decimal"
       placeholder={placeholder}
       style={{
@@ -113,11 +105,47 @@ function NumericInput({
   );
 }
 
+// --- custom legend content (types kept lenient for recharts payload) ---
+function LegendContent({ payload }: any) {
+  return (
+    <div style={{ display: "flex", gap: 16, paddingBottom: 6 }}>
+      {payload?.map((entry: any) => {
+        const isLine = entry.type === "line";
+        return (
+          <div key={entry.value} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            {isLine ? (
+              <span
+                style={{
+                  width: 16,
+                  height: 0,
+                  borderTop: `3px dashed ${entry.color}`,
+                  display: "inline-block",
+                }}
+              />
+            ) : (
+              <span
+                style={{
+                  width: 12,
+                  height: 12,
+                  borderRadius: 3,
+                  background: entry.color,
+                  display: "inline-block",
+                }}
+              />
+            )}
+            <span style={{ color: brand.slate, fontSize: 12 }}>{entry.value}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function Page() {
   const [inp, setInp] = useState<Inputs>(() => {
     if (typeof window === "undefined") return defaults;
     try {
-      const saved = localStorage.getItem("seve.fixed.inputs.v2");
+      const saved = localStorage.getItem("seve.fixed.inputs.v3");
       return saved ? JSON.parse(saved) : defaults;
     } catch {
       return defaults;
@@ -125,9 +153,7 @@ export default function Page() {
   });
 
   useEffect(() => {
-    try {
-      localStorage.setItem("seve.fixed.inputs.v2", JSON.stringify(inp));
-    } catch {}
+    try { localStorage.setItem("seve.fixed.inputs.v3", JSON.stringify(inp)); } catch {}
   }, [inp]);
 
   const d = useMemo(() => {
@@ -152,9 +178,7 @@ export default function Page() {
     const data = monthsArr.map((i) => {
       cum += revenuePerMonth;
       const goalCum = monthlyGoal * (i + 1);
-      const label = new Date(2000, i, 1).toLocaleString(undefined, {
-        month: "short",
-      });
+      const label = new Date(2000, i, 1).toLocaleString(undefined, { month: "short" });
       return { name: label, cumulative: Math.round(cum), goal: Math.round(goalCum) };
     });
 
@@ -176,16 +200,10 @@ export default function Page() {
     };
   }, [inp]);
 
-  // UI helpers
+  // small UI helpers
   const Card = ({
-    title,
-    children,
-    style,
-  }: {
-    title: string;
-    children: any;
-    style?: React.CSSProperties;
-  }) => (
+    title, children, style,
+  }: { title: string; children: any; style?: React.CSSProperties }) => (
     <div
       style={{
         background: brand.card,
@@ -196,54 +214,30 @@ export default function Page() {
         ...style,
       }}
     >
-      <div style={{ fontWeight: 800, color: brand.forest, marginBottom: 10 }}>
-        {title}
-      </div>
+      <div style={{ fontWeight: 800, color: brand.forest, marginBottom: 10 }}>{title}</div>
       {children}
     </div>
   );
 
   const InputField = ({
-    label,
-    value,
-    onCommit,
-  }: {
-    label: string;
-    value: number;
-    onCommit: (n: number) => void;
-  }) => (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "1.2fr 1fr",
-        alignItems: "center",
-        gap: 8,
-      }}
-    >
+    label, value, onCommit,
+  }: { label: string; value: number; onCommit: (n: number) => void }) => (
+    <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", alignItems: "center", gap: 8 }}>
       <div style={{ color: brand.slate, fontSize: 12 }}>{label}</div>
       <NumericInput value={value} onCommit={onCommit} />
     </div>
   );
 
   const Stat = ({ k, v }: { k: string; v: string }) => (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "1.2fr 1fr",
-        alignItems: "center",
-        marginBottom: 8,
-      }}
-    >
+    <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", alignItems: "center", marginBottom: 8 }}>
       <div style={{ color: brand.slate, fontSize: 12 }}>{k}</div>
-      <div style={{ textAlign: "right", fontWeight: 800, color: brand.forest }}>
-        {v}
-      </div>
+      <div style={{ textAlign: "right", fontWeight: 800, color: brand.forest }}>{v}</div>
     </div>
   );
 
   return (
     <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 18px 28px" }}>
-      {/* Top row: Inputs (wide) → KPI1 → KPI2 → KPI3 (sequenced L→R) */}
+      {/* Top row: Inputs (wide) → KPI1 → KPI2 → KPI3 */}
       <div
         style={{
           display: "grid",
@@ -253,13 +247,7 @@ export default function Page() {
         }}
       >
         <Card title="Inputs">
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: 12,
-            }}
-          >
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <InputField
               label="Sales Goal"
               value={inp.salesGoal}
@@ -353,19 +341,18 @@ export default function Page() {
                   [`${money(Number(v))}`, n === "cumulative" ? "Cumulative Revenue" : "Goal"]
                 }
               />
-              <Legend
-                verticalAlign="top"
-                align="left"
-                wrapperStyle={{ paddingBottom: 6 }}
-                payload={[
-                  { value: "Cumulative Revenue", type: "rect", color: brand.deepBlue, id: "cum" },
-                  { value: "Goal", type: "line", color: brand.gold, id: "goal" },
-                ]}
+              <Legend verticalAlign="top" align="left" content={<LegendContent />} />
+
+              <Bar
+                dataKey="cumulative"
+                name="Cumulative Revenue"
+                fill={brand.deepBlue}
+                radius={[8, 8, 0, 0]}
               />
-              <Bar dataKey="cumulative" fill={brand.deepBlue} radius={[8, 8, 0, 0]} />
               <Line
                 type="monotone"
                 dataKey="goal"
+                name="Goal"
                 stroke={brand.gold}
                 strokeDasharray="6 6"
                 strokeWidth={3}
