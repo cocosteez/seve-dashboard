@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import {
   ResponsiveContainer,
   BarChart,
@@ -10,32 +10,30 @@ import {
   Tooltip,
   CartesianGrid,
   Line,
+  Legend,
 } from "recharts";
 
-// ---- Brand / tokens ---------------------------------------------------------
 const brand = {
-  bg: "#0E0F10",
-  surface: "#FFFFFF",
-  border: "#E9E9E9",
-  grid: "#EFEFEF",
-  ink: "#101315",
-  sub: "#6B7075",
-  forest: "#153A2A",
-  blue: "#2C5E8A",
-  gold: "#D4A373",
+  ink: "#0F1112",
+  forest: "#1E3B2F",
+  slate: "#606468",
+  stone: "#E8E5DC",
   off: "#FAFAF7",
+  deepBlue: "#2D5C88",
+  gold: "#D4A373",
+  card: "#FFFFFF",
+  border: "#E6E6E6",
+  grid: "#ECECEC",
 };
 
-// ---- Locks (fixed assumptions) ----------------------------------------------
 const LOCK = {
-  closeRate: 0.6,         // 60%
-  emailToMeeting: 0.10,   // 10%
-  callToMeeting: 0.20,    // 20%
+  closeRate: 0.6,
+  emailToMeeting: 0.1,
+  callToMeeting: 0.2,
   team: 1,
   workdays: 6,
 };
 
-// ---- Types ------------------------------------------------------------------
 type Inputs = {
   salesGoal: number;
   months: number;
@@ -44,10 +42,7 @@ type Inputs = {
   callsPerDay: number;
 };
 
-type MonthRow = { name: string; cumulative: number; goal: number };
-
-// ---- Defaults ---------------------------------------------------------------
-const DEFAULTS: Inputs = {
+const defaults: Inputs = {
   salesGoal: 1_000_000,
   months: 12,
   aov: 288,
@@ -55,34 +50,41 @@ const DEFAULTS: Inputs = {
   callsPerDay: 90,
 };
 
-// ---- Utils ------------------------------------------------------------------
-const money0 = (n: number) =>
-  n.toLocaleString(undefined, { style: "currency", currency: "CAD", maximumFractionDigits: 0 });
+/** Consistent CA$ currency with no cents */
+function money(n: number) {
+  // force CA$ prefix and no decimals
+  const parts = Math.round(n).toLocaleString("en-CA");
+  return `CA$${parts}`;
+}
 
-const pct0 = (n: number) => `${Math.round(n * 100)}%`;
+function pct(n: number) {
+  return (n * 100).toFixed(0) + "%";
+}
 
-// Numeric input that lets you type freely then commit on blur/Enter
+/** Stable numeric input: lets users type freely, commits on blur/enter */
 function NumericInput({
   value,
   onCommit,
   min,
+  max,
 }: {
   value: number;
   onCommit: (n: number) => void;
   min?: number;
+  max?: number;
 }) {
-  const [raw, setRaw] = useState(() => value.toLocaleString());
-
-  useEffect(() => setRaw(value.toLocaleString()), [value]);
+  const [raw, setRaw] = useState(String(value));
+  useEffect(() => setRaw(String(value)), [value]);
 
   const commit = useCallback(() => {
     const cleaned = raw.replace(/,/g, "").trim();
-    const parsed = cleaned === "" ? 0 : Number(cleaned);
-    const next = Number.isFinite(parsed) ? parsed : 0;
-    onCommit(min != null ? Math.max(next, min) : next);
-    // normalize display with grouping
-    setRaw((min != null ? Math.max(next, min) : next).toLocaleString());
-  }, [raw, onCommit, min]);
+    let n = cleaned === "" ? 0 : Number(cleaned);
+    if (!Number.isFinite(n)) n = 0;
+    if (typeof min === "number") n = Math.max(min, n);
+    if (typeof max === "number") n = Math.min(max, n);
+    onCommit(n);
+    setRaw(n.toLocaleString());
+  }, [raw, onCommit, min, max]);
 
   return (
     <input
@@ -92,67 +94,53 @@ function NumericInput({
       onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
       inputMode="decimal"
       style={{
-        width: "100%",
-        border: `1px solid ${brand.border}`,
+        border: `1px solid ${brand.stone}`,
         borderRadius: 10,
         padding: "10px 12px",
         background: brand.off,
         fontWeight: 600,
-        color: brand.ink,
+        width: "100%",
       }}
     />
   );
 }
 
-// ---- Small UI atoms ---------------------------------------------------------
-const Card = ({
-  title,
-  children,
-  minHeight,
-}: {
-  title: string;
-  children: React.ReactNode;
-  minHeight?: number;
-}) => (
-  <div
-    style={{
-      background: brand.surface,
-      border: `1px solid ${brand.border}`,
-      borderRadius: 14,
-      boxShadow: "0 10px 28px rgba(0,0,0,0.06)",
-      padding: 16,
-      minHeight,
-    }}
-  >
-    <div style={{ fontWeight: 800, color: brand.forest, marginBottom: 10 }}>{title}</div>
-    {children}
-  </div>
-);
+/** Small caption under KPI numbers */
+function KpiCaption() {
+  return (
+    <div style={{ marginTop: 6, fontSize: 11, color: brand.slate }}>
+      Calculated from fixed assumptions below
+    </div>
+  );
+}
 
-const KPI = ({ label, value }: { label: string; value: string }) => (
-  <div style={{ display: "grid", gap: 4 }}>
-    <div style={{ color: brand.sub, fontSize: 12 }}>{label}</div>
-    <div style={{ fontWeight: 900, fontSize: 28, color: brand.ink }}>{value}</div>
-  </div>
-);
+/** Custom legend renderer (keeps TS happy by using a function) */
+function CustomLegend(props: any) {
+  const payload = props?.payload ?? [];
+  return (
+    <div style={{ display: "flex", gap: 16, paddingBottom: 6 }}>
+      {payload.map((entry: any) => (
+        <div key={entry?.value} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          {entry?.type === "line" ? (
+            <span style={{ width: 18, height: 0, borderTop: `3px dashed ${entry?.color}` }} />
+          ) : (
+            <span style={{ width: 12, height: 12, background: entry?.color, borderRadius: 2 }} />
+          )}
+          <span style={{ fontSize: 12, color: brand.slate }}>{entry?.value}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
 
-const StatRow = ({ k, v }: { k: string; v: string }) => (
-  <div style={{ display: "grid", gridTemplateColumns: "1fr auto" }}>
-    <div style={{ color: brand.sub, fontSize: 12 }}>{k}</div>
-    <div style={{ fontWeight: 800, color: brand.ink }}>{v}</div>
-  </div>
-);
-
-// ---- Page -------------------------------------------------------------------
 export default function Page() {
-  // inputs with localStorage persistence
   const [inp, setInp] = useState<Inputs>(() => {
-    if (typeof window === "undefined") return DEFAULTS;
+    if (typeof window === "undefined") return defaults;
     try {
       const saved = localStorage.getItem("seve.inputs");
-      return saved ? JSON.parse(saved) : DEFAULTS;
+      return saved ? JSON.parse(saved) : defaults;
     } catch {
-      return DEFAULTS;
+      return defaults;
     }
   });
 
@@ -162,8 +150,7 @@ export default function Page() {
     } catch {}
   }, [inp]);
 
-  // calculations derived from inputs + locks
-  const calc = useMemo(() => {
+  const d = useMemo(() => {
     const weeks = Math.round(inp.months * 4.333);
     const meetingsPerDay =
       inp.emailsPerDay * LOCK.emailToMeeting + inp.callsPerDay * LOCK.callToMeeting;
@@ -174,235 +161,246 @@ export default function Page() {
     const revenueYear = revenuePerMonth * inp.months;
     const ordersYear = ordersPerWeek * weeks;
 
-    // chart rows
+    const monthsArr = Array.from({ length: inp.months }, (_, i) => i);
     const monthlyGoal = inp.salesGoal / inp.months;
+
     let cum = 0;
-    const data: MonthRow[] = Array.from({ length: inp.months }, (_, i) => {
+    const data = monthsArr.map((i) => {
       cum += revenuePerMonth;
       const goalCum = monthlyGoal * (i + 1);
       const label = new Date(2000, i, 1).toLocaleString(undefined, { month: "short" });
-      return { name: label, cumulative: Math.round(cum), goal: Math.round(goalCum) };
+      return {
+        name: label,
+        cumulative: Math.round(cum),
+        goal: Math.round(goalCum),
+      };
     });
 
-    const maxY = Math.max(...data.flatMap((r) => [r.cumulative, r.goal]));
-    const yTickFmt =
+    const maxY = Math.max(...data.map((r) => Math.max(r.cumulative, r.goal)), 1);
+    const yFormat =
       maxY >= 1_000_000
-        ? (v: number) => "$" + (v / 1_000_000).toFixed(1) + "M"
-        : (v: number) => "$" + Math.round(v / 1_000) + "k";
+        ? (v: number) => "CA$" + (v / 1_000_000).toFixed(1) + "M"
+        : (v: number) => "CA$" + Math.round(v / 1000) + "K";
+
+    const yDomain = [0, Math.ceil(maxY * 1.08)];
 
     return {
       meetingsPerDay,
       ordersPerWeek,
       revenuePerWeek,
       revenuePerMonth,
-      ordersYear,
       revenueYear,
+      ordersYear,
       data,
-      yTickFmt,
+      yFormat,
+      yDomain,
     };
   }, [inp]);
 
-  // common card height for the three KPIs
-  const KPI_HEIGHT = 126;
-
-  return (
+  const Card = ({
+    title,
+    children,
+    minHeight,
+  }: {
+    title: string;
+    children: any;
+    minHeight?: number;
+  }) => (
     <div
       style={{
-        maxWidth: 1200,
-        margin: "0 auto",
-        padding: "20px 18px 28px",
+        background: brand.card,
+        borderRadius: 14,
+        border: `1px solid ${brand.border}`,
+        boxShadow: "0 10px 28px rgba(0,0,0,0.08)",
+        padding: 16,
+        minHeight,
       }}
     >
-      {/* Row 1: Inputs (wider) + three KPIs */}
+      <div style={{ fontWeight: 800, color: brand.forest, marginBottom: 10, fontSize: 14 }}>
+        {title}
+      </div>
+      {children}
+    </div>
+  );
+
+  const Stat = ({ k, v }: { k: string; v: string }) => (
+    <div style={{ display: "grid", gridTemplateColumns: "1fr auto", marginBottom: 8 }}>
+      <div style={{ color: brand.slate, fontSize: 12 }}>{k}</div>
+      <div style={{ fontWeight: 800, color: brand.forest }}>{v}</div>
+    </div>
+  );
+
+  // shared style values
+  const kpiMinHeight = 142; // equal height for all KPI cards
+  const headerGap = 14;
+  const inputsRowGap = 12; // increased breathing room
+
+  return (
+    <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 18px 28px" }}>
+      {/* Top: Inputs + KPIs (equal heights & rhythm) */}
       <div
         style={{
           display: "grid",
           gridTemplateColumns: "1.6fr 1fr 1fr 1fr",
-          gap: 14,
+          gap: headerGap,
+          alignItems: "stretch",
         }}
       >
         <Card title="Inputs">
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <div>
-              <div style={{ color: brand.sub, fontSize: 12, marginBottom: 6 }}>Sales Goal</div>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: inputsRowGap,
+            }}
+          >
+            <label>
+              <div style={{ fontSize: 12, color: brand.slate, marginBottom: 6 }}>Sales Goal</div>
               <NumericInput
                 value={inp.salesGoal}
-                onCommit={(n) => setInp((s) => ({ ...s, salesGoal: n }))}
-                min={0}
+                onCommit={(v) => setInp((s) => ({ ...s, salesGoal: v }))}
+                min={1}
+                max={50_000_000}
               />
-            </div>
-            <div>
-              <div style={{ color: brand.sub, fontSize: 12, marginBottom: 6 }}>
+            </label>
+            <label>
+              <div style={{ fontSize: 12, color: brand.slate, marginBottom: 6 }}>
                 Average Order Value
               </div>
-              <NumericInput value={inp.aov} onCommit={(n) => setInp((s) => ({ ...s, aov: n }))} min={1} />
-            </div>
-
-            <div>
-              <div style={{ color: brand.sub, fontSize: 12, marginBottom: 6 }}>
+              <NumericInput
+                value={inp.aov}
+                onCommit={(v) => setInp((s) => ({ ...s, aov: v }))}
+                min={50}
+                max={5_000}
+              />
+            </label>
+            <label>
+              <div style={{ fontSize: 12, color: brand.slate, marginBottom: 6 }}>
                 Timeline (months)
               </div>
               <NumericInput
                 value={inp.months}
-                onCommit={(n) => setInp((s) => ({ ...s, months: Math.max(1, Math.round(n)) }))}
+                onCommit={(v) => setInp((s) => ({ ...s, months: v }))}
                 min={1}
+                max={24}
               />
-            </div>
-            <div>
-              <div style={{ color: brand.sub, fontSize: 12, marginBottom: 6 }}>Emails / Day</div>
+            </label>
+            <label>
+              <div style={{ fontSize: 12, color: brand.slate, marginBottom: 6 }}>Emails / Day</div>
               <NumericInput
                 value={inp.emailsPerDay}
-                onCommit={(n) => setInp((s) => ({ ...s, emailsPerDay: Math.max(0, Math.round(n)) }))}
+                onCommit={(v) => setInp((s) => ({ ...s, emailsPerDay: v }))}
                 min={0}
+                max={500}
               />
-            </div>
-
-            <div>
-              <div style={{ color: brand.sub, fontSize: 12, marginBottom: 6 }}>Calls / Day</div>
+            </label>
+            <label>
+              <div style={{ fontSize: 12, color: brand.slate, marginBottom: 6 }}>Calls / Day</div>
               <NumericInput
                 value={inp.callsPerDay}
-                onCommit={(n) => setInp((s) => ({ ...s, callsPerDay: Math.max(0, Math.round(n)) }))}
+                onCommit={(v) => setInp((s) => ({ ...s, callsPerDay: v }))}
                 min={0}
+                max={500}
               />
-            </div>
+            </label>
           </div>
         </Card>
 
-        <Card title="Meetings / Day" minHeight={KPI_HEIGHT}>
-          <KPI label="" value={calc.meetingsPerDay.toFixed(2)} />
+        <Card title="Meetings / Day" minHeight={kpiMinHeight}>
+          <div style={{ fontSize: 32, fontWeight: 900, lineHeight: 1 }}>
+            {d.meetingsPerDay.toFixed(1)}
+          </div>
+          <KpiCaption />
         </Card>
 
-        <Card title="Orders / Week" minHeight={KPI_HEIGHT}>
-          <KPI label="" value={Math.round(calc.ordersPerWeek).toLocaleString()} />
+        <Card title="Orders / Week" minHeight={kpiMinHeight}>
+          <div style={{ fontSize: 32, fontWeight: 900, lineHeight: 1 }}>
+            {Math.round(d.ordersPerWeek).toLocaleString()}
+          </div>
+          <KpiCaption />
         </Card>
 
-        <Card title="Revenue / Week" minHeight={KPI_HEIGHT}>
-          <KPI label="" value={money0(calc.revenuePerWeek)} />
+        <Card title="Revenue / Week" minHeight={kpiMinHeight}>
+          <div style={{ fontSize: 32, fontWeight: 900, lineHeight: 1 }}>
+            {money(d.revenuePerWeek)}
+          </div>
+          <KpiCaption />
         </Card>
       </div>
 
-      {/* Row 2: Assumptions (fixed) + Monthly Pace + Year at Pace */}
+      {/* Second row */}
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "1.35fr 1fr 1fr",
-          gap: 14,
-          marginTop: 14,
+          gridTemplateColumns: "1.3fr 1fr 1fr",
+          gap: headerGap,
+          marginTop: headerGap,
         }}
       >
         <Card title="Assumptions (Fixed)">
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(5, 1fr)",
-              gap: 10,
-              alignItems: "start",
-            }}
-          >
-            <div
-              style={{
-                border: `1px solid ${brand.border}`,
-                borderRadius: 10,
-                padding: 12,
-                textAlign: "center",
-              }}
-            >
-              <div style={{ color: brand.sub, fontSize: 11, marginBottom: 6 }}>Close Rate</div>
-              <div style={{ fontWeight: 900 }}>{pct0(LOCK.closeRate)}</div>
-            </div>
-            <div
-              style={{
-                border: `1px solid ${brand.border}`,
-                borderRadius: 10,
-                padding: 12,
-                textAlign: "center",
-              }}
-            >
-              <div style={{ color: brand.sub, fontSize: 11, marginBottom: 6 }}>Email → Meeting</div>
-              <div style={{ fontWeight: 900 }}>{pct0(LOCK.emailToMeeting)}</div>
-            </div>
-            <div
-              style={{
-                border: `1px solid ${brand.border}`,
-                borderRadius: 10,
-                padding: 12,
-                textAlign: "center",
-              }}
-            >
-              <div style={{ color: brand.sub, fontSize: 11, marginBottom: 6 }}>Call → Meeting</div>
-              <div style={{ fontWeight: 900 }}>{pct0(LOCK.callToMeeting)}</div>
-            </div>
-            <div
-              style={{
-                border: `1px solid ${brand.border}`,
-                borderRadius: 10,
-                padding: 12,
-                textAlign: "center",
-              }}
-            >
-              <div style={{ color: brand.sub, fontSize: 11, marginBottom: 6 }}>Team Size</div>
-              <div style={{ fontWeight: 900 }}>{LOCK.team}</div>
-            </div>
-            <div
-              style={{
-                border: `1px solid ${brand.border}`,
-                borderRadius: 10,
-                padding: 12,
-                textAlign: "center",
-              }}
-            >
-              <div style={{ color: brand.sub, fontSize: 11, marginBottom: 6 }}>Workdays / Week</div>
-              <div style={{ fontWeight: 900 }}>{LOCK.workdays}</div>
-            </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10 }}>
+            <Stat k="Close Rate" v="60%" />
+            <Stat k="Email→Meeting" v="10%" />
+            <Stat k="Call→Meeting" v="20%" />
+            <Stat k="Team Size" v="1" />
+            <Stat k="Workdays / Week" v="6" />
           </div>
         </Card>
 
         <Card title="Monthly Pace">
-          <div style={{ display: "grid", gap: 8 }}>
-            <StatRow k="Revenue / Month" v={money0(calc.revenuePerMonth)} />
-            <StatRow
-              k="3‑Month Cumulative"
-              v={money0(calc.data[Math.min(2, calc.data.length - 1)]?.cumulative || 0)}
-            />
+          <Stat k="Revenue / Month" v={money(d.revenuePerMonth)} />
+          <div
+            style={{
+              height: 1,
+              background: "rgba(0,0,0,0.12)",
+              margin: "8px 0 10px",
+            }}
+          />
+          <Stat k="Cumulative (3 mo)" v={money(d.data[2]?.cumulative || 0)} />
+          <div style={{ marginTop: 4, fontSize: 11, color: brand.slate }}>
+            Assumes 4.333 weeks / month
           </div>
         </Card>
 
         <Card title="Year at Pace">
-          <div style={{ display: "grid", gap: 8 }}>
-            <StatRow k="Orders (year)" v={Math.round(calc.ordersYear).toLocaleString()} />
-            <StatRow k="Revenue (year)" v={money0(calc.revenueYear)} />
-            <StatRow k="% of Goal" v={pct0(calc.revenueYear / inp.salesGoal)} />
-          </div>
+          <Stat k="Orders (year)" v={Math.round(d.ordersYear).toLocaleString()} />
+          <Stat k="Revenue (year)" v={money(d.revenueYear)} />
+          <div
+            style={{
+              height: 1,
+              background: "rgba(0,0,0,0.12)",
+              margin: "8px 0 10px",
+            }}
+          />
+          <Stat k="% of Year Goal" v={pct(d.revenueYear / inp.salesGoal)} />
         </Card>
       </div>
 
-      {/* Row 3: Chart */}
-      <Card title="Cumulative Revenue vs Goal" minHeight={420} >
-        {/* Custom legend */}
-        <div style={{ display: "flex", gap: 16, padding: "0 4px 8px 4px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ width: 12, height: 12, background: brand.blue, borderRadius: 3 }} />
-            <span style={{ fontSize: 12, color: brand.sub }}>Cumulative Revenue</span>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ width: 18, height: 0, borderTop: `3px dashed ${brand.gold}` }} />
-            <span style={{ fontSize: 12, color: brand.sub }}>Goal</span>
-          </div>
-        </div>
-
-        <div style={{ height: 340 }}>
+      {/* Chart */}
+      <Card title="Cumulative Revenue vs Goal" >
+        <div style={{ height: 360, marginTop: 6 }}>
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={calc.data} margin={{ top: 4, right: 12, left: 0, bottom: 0 }}>
+            <BarChart data={d.data} margin={{ top: 6, right: 12, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke={brand.grid} />
-              <XAxis dataKey="name" stroke={brand.sub} />
-              <YAxis stroke={brand.sub} tickFormatter={calc.yTickFmt as any} />
+              <XAxis dataKey="name" stroke={brand.slate} />
+              <YAxis
+                stroke={brand.slate}
+                tickFormatter={d.yFormat as any}
+                domain={d.yDomain as any}
+              />
               <Tooltip
-                formatter={(v: any, k: any) => [
-                  money0(Number(v)),
-                  k === "cumulative" ? "Cumulative Revenue" : "Goal",
+                formatter={(v: any, n: any) => [
+                  money(Number(v)),
+                  n === "cumulative" ? "Cumulative Revenue" : "Goal",
                 ]}
               />
-              <Bar dataKey="cumulative" name="Cumulative Revenue" fill={brand.blue} radius={[8, 8, 0, 0]} />
+              <Legend verticalAlign="top" align="left" content={(p) => <CustomLegend {...p} />} />
+              <Bar
+                dataKey="cumulative"
+                name="Cumulative Revenue"
+                fill={brand.deepBlue}
+                radius={[8, 8, 0, 0]}
+              />
               <Line
                 type="monotone"
                 dataKey="goal"
