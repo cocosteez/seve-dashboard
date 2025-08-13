@@ -13,7 +13,6 @@ import {
   Legend,
 } from "recharts";
 
-/* Brand tokens */
 const brand = {
   ink: "#0F1112",
   forest: "#1E3B2F",
@@ -28,11 +27,11 @@ const brand = {
 };
 
 const LOCK = {
-  closeRate: 0.6, // fixed
-  emailToMeeting: 0.1, // fixed
-  callToMeeting: 0.2, // fixed
-  team: 1, // fixed
-  workdays: 6, // fixed
+  closeRate: 0.6,
+  emailToMeeting: 0.1,
+  callToMeeting: 0.2,
+  team: 1,
+  workdays: 6,
 };
 
 type Inputs = {
@@ -59,7 +58,6 @@ function pct(n: number) {
   return (n * 100).toFixed(0) + "%";
 }
 
-/** Numeric input that won’t reset while typing */
 function NumericInput({
   value,
   onCommit,
@@ -103,7 +101,6 @@ function NumericInput({
   );
 }
 
-/** Custom legend (typed loosely to avoid recharts type friction on Vercel) */
 function CustomLegend(props: any) {
   const payload = props?.payload ?? [];
   return (
@@ -123,7 +120,6 @@ function CustomLegend(props: any) {
 }
 
 export default function Page() {
-  /* Inputs */
   const [inp, setInp] = useState<Inputs>(() => {
     if (typeof window === "undefined") return defaults;
     try {
@@ -139,7 +135,6 @@ export default function Page() {
     } catch {}
   }, [inp]);
 
-  /* Sales closed (for progress bar) */
   const [closed, setClosed] = useState<number>(() => {
     if (typeof window === "undefined") return 0;
     const v = localStorage.getItem("seve.closed");
@@ -151,7 +146,6 @@ export default function Page() {
     } catch {}
   }, [closed]);
 
-  /* Calculations */
   const d = useMemo(() => {
     const weeks = Math.round(inp.months * 4.333);
     const meetingsPerDay =
@@ -194,7 +188,6 @@ export default function Page() {
     };
   }, [inp]);
 
-  /* Card + stat helpers */
   const Card = ({
     title,
     children,
@@ -228,14 +221,12 @@ export default function Page() {
     </div>
   );
 
-  /* Layout constants */
   const OUTER_MAX = 1220;
   const OUTER_PAD = 24;
-  const TOP_SPACER = 8; // header already has padding
+  const TOP_SPACER = 8;
   const GRID_GAP = 16;
   const KPI_MIN_H = 140;
 
-  /* Progress bar values */
   const progress = Math.max(0, Math.min(1, closed / Math.max(1, inp.salesGoal)));
 
   return (
@@ -246,7 +237,6 @@ export default function Page() {
         padding: `${TOP_SPACER}px ${OUTER_PAD}px 48px`,
       }}
     >
-      {/* Row: Inputs + KPIs */}
       <div
         style={{
           display: "grid",
@@ -337,7 +327,6 @@ export default function Page() {
         </Card>
       </div>
 
-      {/* Row: Monthly pace + Year pace + Closing sales */}
       <div
         style={{
           display: "grid",
@@ -362,7 +351,6 @@ export default function Page() {
           <Stat k="% of Year Goal" v={pct(d.revenueYear / inp.salesGoal)} />
         </Card>
 
-        {/* Closing Sales (with progress) */}
         <Card title="Closing Sales">
           <div style={{ display: "grid", gridTemplateColumns: "1fr auto auto", gap: 10 }}>
             <NumericInput
@@ -401,7 +389,6 @@ export default function Page() {
             </div>
           </div>
 
-          {/* Progress Bar */}
           <div style={{ marginTop: 12 }}>
             <div
               style={{
@@ -437,7 +424,6 @@ export default function Page() {
         </Card>
       </div>
 
-      {/* Chart */}
       <Card title="Cumulative Revenue vs Goal" >
         <div style={{ height: 380, marginTop: 6 }}>
           <ResponsiveContainer width="100%" height="100%">
@@ -472,7 +458,7 @@ export default function Page() {
         </div>
       </Card>
 
-      {/* Bottom: Assumptions (smaller) */}
+      {/* Assumptions at the bottom, compact */}
       <div
         style={{
           marginTop: 16,
@@ -503,7 +489,6 @@ export default function Page() {
         </div>
       </div>
 
-      {/* Footer */}
       <div
         style={{
           marginTop: 18,
@@ -518,7 +503,6 @@ export default function Page() {
   );
 }
 
-/* Small helper styles for assumptions band */
 function miniBox(): React.CSSProperties {
   return {
     background: "rgba(255,255,255,0.92)",
